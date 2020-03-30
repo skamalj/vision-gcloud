@@ -1,17 +1,25 @@
-// Imports the Google Cloud client libraries
-const vision = require('@google-cloud/vision');
+const express = require('express');
 
-// Creates a client
-const client = new vision.ImageAnnotatorClient();
+var app = express();
 
-/**
- * TODO(developer): Uncomment the following line before running the sample.
- */
-const gcsUri = `gs://bucket/bucketImage.png`;
+//set up handlebars view engine and express app
+var handlebars = require('express-handlebars').create({
+	defaultLayout : 'vision'
+});
 
-async function myFunction(client) {
-    const [result] = await client.objectLocalization(gcsUri);
-    const objects = result.localizedObjectAnnotations;
-}
+app.engine('handlebars', handlebars.engine);
+app.set('view engine', 'handlebars');
 
-  myFunction(client);
+app.use(express.static(__dirname + '/public'));
+
+app.get('/', (req, res) => {
+  res.render('dummy');
+	});
+
+require("./routes/routes.js")(app);
+
+app.set('port', process.env.PORT || 9000);
+app.listen(app.get('port'), function() {
+	console.info('Express started on http://localhost:' + app.get('port')
+			+ '; press Ctrl-C to terminate.');
+});

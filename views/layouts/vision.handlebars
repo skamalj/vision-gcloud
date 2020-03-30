@@ -1,0 +1,154 @@
+<head>
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+  <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js" integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.6.10/dist/vue.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@2.8.0"></script>
+</head>
+<div class="container-fluid"  id="jumps">
+  <div class="row">
+    <div class="col-2">
+      <button type="button" class="btn btn-success" v-on:click="startCapture">Start Capture</button>
+    </div>
+    <div class="col-2">  
+      <button type="button" class="btn btn-danger" v-on:click="stopCapture">Stop Capture</button>
+    </div>
+    <div class="col-2">
+        <h1 class="display-2">\{{ total_jumps }}</h1>
+    </div>  
+  </div>
+</div>
+
+<video width="320" height="240" id="player" controls autoplay></video>
+<canvas id="canvas" width=320 height=240></canvas>
+<canvas id="myChart" width=640 height=120></canvas>
+
+<script>
+  const player = document.getElementById('player');
+  const canvas = document.getElementById('canvas');
+  const context = canvas.getContext('2d');
+  var mychartctx = document.getElementById('myChart').getContext('2d');;
+  const image = new Image();
+
+  const constraints = {
+    video: true,
+  };
+
+  // Attach the video stream to the video element and autoplay.
+  navigator.mediaDevices.getUserMedia(constraints)
+    .then((stream) => {
+      player.srcObject = stream;
+    });
+
+
+var drawChart = new Chart(mychartctx, {
+    type: 'bar',
+    data: {
+        labels: [1,2,3,4,5,6],
+        datasets: [{
+            label: 'Jump Graph',
+            yAxisID: 'leftAxis',
+            borderColor: '#cc65fe',
+            data: [1,2,3,4,5,6],
+            fill: false,
+            type: 'line'
+        }]
+    },
+    options: {
+        scales: {
+            yAxes: [{
+            	id: 'leftAxis',	
+            	position: 'left',
+                ticks: {
+                    beginAtZero:false
+                }
+            }]
+        }
+    }
+});
+
+  var vueObj = new Vue({
+    el: "#jumps",
+    data: {
+      y_loc: {},
+      currentindex: 0,
+      jumps: [],
+      log: 'Log: ',
+      intervalObj: '',
+      chartObj: drawChart
+    },
+    methods: {
+      startCapture: function (event) {
+        this.currentindex = 0;
+        this.log = 'Log: '
+        this.jumps = []
+        this.intervalObj = setInterval(() => {
+          captureVideoStream(this, this.currentindex++)
+        }, 300)
+      },
+      stopCapture: function () {
+        clearInterval(this.intervalObj);
+      }
+    },
+    watch: {
+      jumps: function(val) {
+        var current_loc = this.y_loc
+        this.chartObj.data.datasets[0].data = Object.values(current_loc);
+        this.chartObj.data.labels = Object.keys(current_loc);
+        this.chartObj.update();
+      }
+    },
+    computed: {
+      total_jumps: function() {
+        return this.jumps.length
+      }
+    }
+    
+  })
+
+
+
+  function captureVideoStream(vueObj, index) {
+
+    context.drawImage(player, 0, 0, canvas.width, canvas.height);
+    image.src = canvas.toDataURL("image/jpeg");
+
+    fetch("http://localhost:9000/getImageCoordinates", {
+      method: "post",
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ dataurl: image.src })
+    })
+      .then(function (response) {
+        return response.json();
+      })
+      .then(function (data) {
+        x = data[0][0].x * canvas.width;
+        y = data[0][0].y * canvas.height;
+        x1 = data[0][2].x * canvas.width;
+        y1 = data[0][2].y * canvas.height;
+        vueObj.y_loc[index] = y.toFixed(0);
+
+        //vueObj.log = vueObj.log + ' Current value is : ' + vueObj.y_loc[index] + "  for index: " + index
+
+        if ((vueObj.y_loc[index - 2] > vueObj.y_loc[index - 1]) && (vueObj.y_loc[index] > vueObj.y_loc[index - 1])) {
+          vueObj.jumps.push(1);
+        }
+
+        if ((vueObj.y_loc[index] > vueObj.y_loc[index + 1]) && (vueObj.y_loc[index + 2] > vueObj.y_loc[index + 1])) {
+          vueObj.jumps.push(1);
+        }
+
+        if ((vueObj.y_loc[index - 1] > vueObj.y_loc[index]) && (vueObj.y_loc[index + 1] > vueObj.y_loc[index])) {
+          vueObj.jumps.push(1);
+        }
+
+      });
+
+  };
+
+</script>
