@@ -83,10 +83,12 @@ var drawChart = new Chart(mychartctx, {
       startCapture: function (event) {
         this.currentindex = 0;
         this.log = 'Log: '
+        this.y_loc = {}
         this.jumps = []
+        this.y_loc = {}
         this.intervalObj = setInterval(() => {
           captureVideoStream(this, this.currentindex++)
-        }, 300)
+        }, 250)
       },
       stopCapture: function () {
         clearInterval(this.intervalObj);
@@ -131,21 +133,22 @@ var drawChart = new Chart(mychartctx, {
         y = data[0][0].y * canvas.height;
         x1 = data[0][2].x * canvas.width;
         y1 = data[0][2].y * canvas.height;
-        vueObj.y_loc[index] = y.toFixed(0);
+        var y_int = y.toFixed(0);
 
         //vueObj.log = vueObj.log + ' Current value is : ' + vueObj.y_loc[index] + "  for index: " + index
 
-        if ((vueObj.y_loc[index - 2] > vueObj.y_loc[index - 1]) && (vueObj.y_loc[index] > vueObj.y_loc[index - 1])) {
+        if ((vueObj.y_loc[index - 2] > vueObj.y_loc[index - 1]) && (y_int > vueObj.y_loc[index - 1])) {
           vueObj.jumps.push(1);
         }
 
-        if ((vueObj.y_loc[index] > vueObj.y_loc[index + 1]) && (vueObj.y_loc[index + 2] > vueObj.y_loc[index + 1])) {
+        if ((y_int > vueObj.y_loc[index + 1]) && (vueObj.y_loc[index + 2] > vueObj.y_loc[index + 1])) {
           vueObj.jumps.push(1);
         }
 
-        if ((vueObj.y_loc[index - 1] > vueObj.y_loc[index]) && (vueObj.y_loc[index + 1] > vueObj.y_loc[index])) {
+        if ((vueObj.y_loc[index - 1] >y_int) && (vueObj.y_loc[index + 1] > y_int)) {
           vueObj.jumps.push(1);
         }
+        vueObj.y_loc[index] = y.toFixed(0);
 
       });
 
