@@ -8,28 +8,61 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@2.8.0"></script>
 </head>
 <div class="container-fluid"  id="jumps">
-  <div class="row">
-    <div class="col-2">
-      <button type="button" class="btn btn-success" v-on:click="startCapture">Start Capture</button>
+  <div class="row align-items-center justify-content-center">
+    <div class="col-md-2 align-middle">
+      <button type="button" class="btn-lg btn-success" v-on:click="startCapture">Start Capture</button>
     </div>
-    <div class="col-2">  
-      <button type="button" class="btn btn-danger" v-on:click="stopCapture">Stop Capture</button>
+    <div class="col-md-2">  
+      <button type="button" class="btn-lg btn-danger" v-on:click="stopCapture">Stop Capture</button>
     </div>
-    <div class="col-2">
-        <h1 class="display-2">\{{ total_jumps }}</h1>
+    <div class="col-md-2 justify-content-center">
+      <div class="row justify-content-center">
+        <h1 class="display-2">\{{ jumps }}</h1>
+      </div>
+      <div class="row justify-content-center">
+        <h4><span class="badge badge-secondary">Number of Jumps</span></h4>
+      </div>  
     </div>  
+    <div class="col-md-2">
+      <div class="row justify-content-center">
+        <h1 class="display-2">\{{ total_resps }}</h1>
+      </div>
+      <div class="row justify-content-center">
+        <h4><span class="badge badge-secondary">GCloud Responses</span></h4>
+      </div>     
+    </div>  
+    <div class="col-md-2">
+      <div class="row justify-content-center">
+        <h1 class="display-2">\{{ currentindex }}</h1>
+      </div>
+      <div class="row justify-content-center">
+        <h4><span class="badge badge-secondary">GCloud Requests</span></h4>
+      </div>     
+    </div>  
+  </div>
+  <div class="container-fluid">
+  <div class="row text-nowrap">
+    <h5><span class="badge badge-secondary">Response Sequence</span></h5>
+    \{{ resp_recv_str }}
+  </div>
   </div>
 </div>
 
 <video width="320" height="240" id="player" controls autoplay></video>
 <canvas id="canvas" width=320 height=240></canvas>
-<canvas id="myChart" width=640 height=120></canvas>
+<div class="container-fluid">
+  <canvas id="myChart" width=640 height=120></canvas>
+</div>
+
 
 <script>
   const player = document.getElementById('player');
   const canvas = document.getElementById('canvas');
   const context = canvas.getContext('2d');
   var mychartctx = document.getElementById('myChart').getContext('2d');;
+
+  var wait = ms => new Promise( r => setTimeout(r, ms))
+
   const image = new Image();
 
   const constraints = {
@@ -48,12 +81,16 @@ var drawChart = new Chart(mychartctx, {
     data: {
         labels: [1,2,3,4,5,6],
         datasets: [{
-            label: 'Jump Graph',
+            label: 'GCP response',
             yAxisID: 'leftAxis',
             borderColor: '#cc65fe',
             data: [1,2,3,4,5,6],
             fill: false,
             type: 'line'
+        },{
+          label: 'Jumps',
+            data: [],
+            type: 'line',
         }]
     },
     options: {
@@ -64,7 +101,7 @@ var drawChart = new Chart(mychartctx, {
                 ticks: {
                     beginAtZero:false
                 }
-            }]
+            }]  
         }
     }
 });
@@ -74,7 +111,11 @@ var drawChart = new Chart(mychartctx, {
     data: {
       y_loc: {},
       currentindex: 0,
-      jumps: [],
+      captureVideo: false,
+      resprecv: [],
+      jumpCountedAt: [],
+      jumpCounter: 0,
+      jumps: 0,
       log: 'Log: ',
       intervalObj: '',
       chartObj: drawChart
@@ -82,29 +123,63 @@ var drawChart = new Chart(mychartctx, {
     methods: {
       startCapture: function (event) {
         this.currentindex = 0;
+        this.captureVideo = true;
         this.log = 'Log: '
         this.y_loc = {}
-        this.jumps = []
+        this.jumps = 0
         this.y_loc = {}
+        this.jumpCounter = 0;
+        this.jumpCountedAt = [],
+        this.resprecv = [];
+        this.countJumps();
         this.intervalObj = setInterval(() => {
           captureVideoStream(this, this.currentindex++)
         }, 250)
       },
       stopCapture: function () {
         clearInterval(this.intervalObj);
-      }
+        this.captureVideo = false;
+      },
+      countJumps: async function() {
+        while(this.captureVideo || this.jumpCounter < this.currentindex) {
+            if(this.y_loc[this.jumpCounter]) {
+              var n3 = parseInt(this.y_loc[this.jumpCounter -3]);
+              var n2 = parseInt(this.y_loc[this.jumpCounter -2]);
+              var n1 = parseInt(this.y_loc[this.jumpCounter -1]);
+              var n = parseInt(this.y_loc[this.jumpCounter]);
+              if (n1 == n2) n2 = n3;
+              if(n2 > n1 && n > n1){
+                 this.jumps++;
+                 this.jumpCountedAt.push(this.y_loc[this.jumpCounter])
+                 this.jumpCounter++;
+              } else {
+                  this.jumpCountedAt.push(0)  
+                  this.jumpCounter++;  
+              }     
+            } else {
+              await wait(1000);
+            }
+      }}
     },
     watch: {
       jumps: function(val) {
         var current_loc = this.y_loc
+        var jumpcountedpoints = this.jumpCountedAt;
         this.chartObj.data.datasets[0].data = Object.values(current_loc);
+        this.chartObj.data.datasets[1].data = Object.values(jumpcountedpoints);
         this.chartObj.data.labels = Object.keys(current_loc);
         this.chartObj.update();
       }
     },
     computed: {
-      total_jumps: function() {
-        return this.jumps.length
+      total_resps: function() {
+        return this.resprecv.length;
+      },
+      resp_recv_str: function() {
+        return this.resprecv.toString();
+      },
+      jumpCountedAt_str: function () {
+         return this.jumpCountedAt.toString();
       }
     }
     
@@ -129,26 +204,10 @@ var drawChart = new Chart(mychartctx, {
         return response.json();
       })
       .then(function (data) {
-        x = data[0][0].x * canvas.width;
-        y = data[0][0].y * canvas.height;
-        x1 = data[0][2].x * canvas.width;
-        y1 = data[0][2].y * canvas.height;
-        var y_int = y.toFixed(0);
-
-        //vueObj.log = vueObj.log + ' Current value is : ' + vueObj.y_loc[index] + "  for index: " + index
-
-        if ((vueObj.y_loc[index - 2] > vueObj.y_loc[index - 1]) && (y_int > vueObj.y_loc[index - 1])) {
-          vueObj.jumps.push(1);
-        }
-
-        if ((y_int > vueObj.y_loc[index + 1]) && (vueObj.y_loc[index + 2] > vueObj.y_loc[index + 1])) {
-          vueObj.jumps.push(1);
-        }
-
-        if ((vueObj.y_loc[index - 1] >y_int) && (vueObj.y_loc[index + 1] > y_int)) {
-          vueObj.jumps.push(1);
-        }
+        
+        y = data[0][0].y * canvas.height;        
         vueObj.y_loc[index] = y.toFixed(0);
+        vueObj.resprecv.push(index)
 
       });
 
