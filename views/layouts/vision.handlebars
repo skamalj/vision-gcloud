@@ -116,12 +116,13 @@ var drawChart = new Chart(mychartctx, {
       jumpCountedAt: [],
       jumpCounter: 0,
       jumps: 0,
+      jumpCounterSkipCheck: {},
       log: 'Log: ',
       intervalObj: '',
       chartObj: drawChart
     },
     methods: {
-      startCapture: function (event) {
+      startCapture: async function (event) {
         this.currentindex = 0;
         this.captureVideo = true;
         this.log = 'Log: '
@@ -130,11 +131,13 @@ var drawChart = new Chart(mychartctx, {
         this.y_loc = {}
         this.jumpCounter = 0;
         this.jumpCountedAt = [],
+        this.jumpCounterSkipCheck =  {},
         this.resprecv = [];
         this.countJumps();
+        await wait(5000);
         this.intervalObj = setInterval(() => {
           captureVideoStream(this, this.currentindex++)
-        }, 250)
+        }, 200)
       },
       stopCapture: function () {
         clearInterval(this.intervalObj);
@@ -157,7 +160,16 @@ var drawChart = new Chart(mychartctx, {
                   this.jumpCounter++;  
               }     
             } else {
+              if(this.jumpCounterSkipCheck[this.jumpCounter]) {
+                this.jumpCounterSkipCheck[this.jumpCounter]++
+              } else {
+                this.jumpCounterSkipCheck[this.jumpCounter] = 1
+              }
+              if (this.jumpCounterSkipCheck[this.jumpCounter] == 5) {
+                this.y_loc[this.jumpCounter] = this.y_loc[this.jumpCounter - 1]
+              } else {
               await wait(1000);
+              }
             }
       }}
     },
